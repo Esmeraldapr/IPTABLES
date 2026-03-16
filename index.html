@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EL TEST DEL TERROR DE IPTABLES</title>
+    <style>
+        :root {
+            --bg: #1a1a2e;
+            --card: #16213e;
+            --accent: #e94560;
+            --correct: #2d6a4f;
+            --wrong: #6a2d2d;
+        }
+        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); color: #e0e0e0; padding: 20px; }
+        .container { max-width: 800px; margin: auto; }
+        
+        /* Estilos de la imagen del Gato */
+        .img-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .img-container img {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            border: 4px solid var(--accent);
+            box-shadow: 0 0 20px rgba(233, 69, 96, 0.6);
+            object-fit: cover;
+        }
+
+        h1 { text-align: center; color: #fff; background: var(--accent); padding: 20px; border-radius: 10px; margin-top: 0; }
+        
+        .pregunta-card { background: var(--card); border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .opcion { display: block; background: #0f3460; margin: 10px 0; padding: 15px; border-radius: 8px; cursor: pointer; transition: 0.3s; }
+        .opcion.disabled { pointer-events: none; opacity: 0.7; }
+        .opcion:hover { background: #533483; transform: scale(1.01); }
+
+        .feedback { display: none; margin-top: 15px; padding: 15px; border-radius: 8px; font-weight: bold; }
+        .correcto { background: #1b4332; color: #81c784; border: 1px solid var(--correct); }
+        .incorrecto { background: #431b1b; color: #e57373; border: 1px solid var(--wrong); }
+
+        #resultado-final { 
+            display: none; 
+            text-align: center; 
+            padding: 40px; 
+            background: var(--card); 
+            border-radius: 15px; 
+            margin-top: 30px; 
+            border: 2px solid var(--accent);
+        }
+        .circle-wrap {
+            margin: 20px auto;
+            width: 150px;
+            height: 150px;
+            background: #fefefe;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #1a1a2e;
+            position: relative;
+        }
+        .circle-wrap.pass { border: 10px solid #81c784; box-shadow: 0 0 20px #81c784; color: #1b4332; }
+        .circle-wrap.fail { border: 10px solid #e57373; box-shadow: 0 0 20px #e57373; color: #431b1b; }
+        
+        button { background: var(--accent); color: white; border: none; padding: 15px 30px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        button:hover { background: #ff4d6d; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="img-container">
+        <img src="HACKCAT.jpg" alt="HACKCAT">
+    </div>
+
+    <h1>🔥 EL TEST DEL TERROR: IPTABLES 🔥</h1>
+    
+    <div id="quiz"></div>
+
+    <div id="resultado-final">
+        <h2>PUNTUACIÓN OBTENIDA</h2>
+        <div id="circulo" class="circle-wrap">0/10</div>
+        <p id="mensaje-final" style="font-size: 1.2em; font-weight: bold; margin-bottom: 20px;"></p>
+        <button onclick="location.reload()">REINTENTAR TEST</button>
+    </div>
+</div>
+
+<script>
+    const preguntas = [
+        { q: "1. ¿Cómo redirigir el tráfico que llega al puerto 21 hacia el servidor FTP?", opts: { A: "DNAT --to-source 2.2.2.2", B: "DNAT --to-destination 2.2.2.2", C: "Falta '-t nat'" }, ans: "B", exp: "DNAT usa --to-destination para redirigir tráfico entrante." },
+        { q: "2. Abrir el rango para modo Pasivo (40000:40100) en NAT:", opts: { A: "Protocolo UDP", B: "Usar origen -s", C: "Protocolo TCP y destino -d" }, ans: "C", exp: "En NAT PREROUTING buscamos el destino (-d) y el protocolo TCP." },
+        { q: "3. Configurar SNAT para salir por interfaz eth2:", opts: { A: "POSTROUTING e interfaz -o", B: "PREROUTING e interfaz -o", C: "POSTROUTING e interfaz -i" }, ans: "A", exp: "SNAT siempre va en POSTROUTING y usa la interfaz de salida (-o)." },
+        { q: "4. Aceptar tráfico NEW en puerto 21:", opts: { A: "En tabla NAT", B: "En tabla FILTER con -s", C: "En tabla FILTER con -d" }, ans: "C", exp: "El filtrado de paquetes (ACCEPT/DROP) se hace en la tabla filter." },
+        { q: "5. ¿Cuál es la política por defecto en DROP?", opts: { A: "iptables -P FORWARD DROP", B: "iptables -A FORWARD DROP", C: "iptables -p FORWARD DROP" }, ans: "A", exp: "Se usa -P (mayúscula) para definir la Política." },
+        { q: "6. Permitir conexiones ESTABLISHED,RELATED:", opts: { A: "Solo tráfico NEW", B: "En tabla FILTER", C: "En tabla NAT" }, ans: "B", exp: "Es vital para que los paquetes de respuesta vuelvan a pasar." },
+        { q: "7. ¿Cómo se activa el enrutamiento en el kernel?", opts: { A: "Valor 0", B: "sysctl -r", C: "Valor 1 con sysctl -w" }, ans: "C", exp: "El valor 1 habilita el 'forwarding' de IPs." },
+        { q: "8. Permiso en FILTER para FTP Pasivo:", opts: { A: "Hacia IP privada", B: "Hacia IP pública", C: "Usando --sport" }, ans: "B", exp: "En la cadena FORWARD el paquete ya lleva la IP de destino tras el NAT." },
+        { q: "9. Permitir entrada de datos modo Pasivo:", opts: { A: "Puerto 20", B: "DNAT en puertos altos", C: "ACCEPT en puertos altos (NEW)" }, ans: "C", exp: "El modo pasivo requiere abrir los puertos altos configurados." },
+        { q: "10. ¿Cómo bloquear acceso AL propio firewall?", opts: { A: "Cadena INPUT", B: "Cadena FORWARD", C: "Cadena OUTPUT" }, ans: "A", exp: "INPUT controla los paquetes que tienen como destino el propio host." }
+    ];
+
+    let aciertos = 0;
+    let respondidas = 0;
+    const quizContainer = document.getElementById('quiz');
+
+    preguntas.forEach((p, i) => {
+        const card = document.createElement('div');
+        card.className = 'pregunta-card';
+        card.innerHTML = `<p><strong>${p.q}</strong></p>`;
+        
+        Object.keys(p.opts).forEach(letra => {
+            const btn = document.createElement('div');
+            btn.className = 'opcion';
+            btn.innerText = letra + ") " + p.opts[letra];
+            btn.onclick = function() {
+                if(this.parentElement.dataset.contestada === "true") return;
+                
+                respondidas++;
+                this.parentElement.dataset.contestada = "true";
+                const feedback = document.getElementById('f' + i);
+                feedback.style.display = 'block';
+
+                if (letra === p.ans) {
+                    aciertos++;
+                    feedback.className = 'feedback correcto';
+                    feedback.innerHTML = `✅ ¡ACERTASTE! <br> ${p.exp}`;
+                } else {
+                    feedback.className = 'feedback incorrecto';
+                    feedback.innerHTML = `❌ FALLASTE (Era la ${p.ans}). <br> ${p.exp}`;
+                }
+                
+                this.parentElement.querySelectorAll('.opcion').forEach(o => o.classList.add('disabled'));
+                if(respondidas === preguntas.length) mostrarResultado();
+            };
+            card.appendChild(btn);
+        });
+
+        const f = document.createElement('div');
+        f.id = 'f' + i;
+        f.className = 'feedback';
+        card.appendChild(f);
+        quizContainer.appendChild(card);
+    });
+
+    function mostrarResultado() {
+        const resDiv = document.getElementById('resultado-final');
+        const circulo = document.getElementById('circulo');
+        const msg = document.getElementById('mensaje-final');
+        
+        resDiv.style.display = 'block';
+        circulo.innerText = `${aciertos}/${preguntas.length}`;
+        
+        const porcentaje = (aciertos / preguntas.length) * 100;
+        
+        if(porcentaje >= 50) {
+            circulo.className = 'circle-wrap pass';
+            msg.innerHTML = "¡SISTEMA PROTEGIDO!<br>Eres un maestro del firewall.";
+            msg.style.color = "#81c784";
+        } else {
+            circulo.className = 'circle-wrap fail';
+            msg.innerHTML = "¡SISTEMA COMPROMETIDO!<br>El firewall te ha bloqueado.";
+            msg.style.color = "#e57373";
+        }
+        
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
+</script>
+
+</body>
+</html>
