@@ -36,10 +36,11 @@
         .opcion.disabled { pointer-events: none; opacity: 0.7; }
         .opcion:hover { background: #533483; transform: scale(1.01); }
 
-        .feedback { display: none; margin-top: 15px; padding: 15px; border-radius: 8px; font-weight: bold; }
+        .feedback { display: none; margin-top: 15px; padding: 15px; border-radius: 8px; font-weight: bold; line-height: 1.4; }
         .correcto { background: #1b4332; color: #81c784; border: 1px solid var(--correct); }
         .incorrecto { background: #431b1b; color: #e57373; border: 1px solid var(--wrong); }
 
+        /* Estilos del Círculo de Resultado Final */
         #resultado-final { 
             display: none; 
             text-align: center; 
@@ -91,16 +92,66 @@
 
 <script>
     const preguntas = [
-        { q: "1. ¿Cómo redirigir el tráfico que llega al puerto 21 hacia el servidor FTP?", opts: { A: "DNAT --to-source 2.2.2.2", B: "DNAT --to-destination 2.2.2.2", C: "Falta '-t nat'" }, ans: "B", exp: "DNAT usa --to-destination para redirigir tráfico entrante." },
-        { q: "2. Abrir el rango para modo Pasivo (40000:40100) en NAT:", opts: { A: "Protocolo UDP", B: "Usar origen -s", C: "Protocolo TCP y destino -d" }, ans: "C", exp: "En NAT PREROUTING buscamos el destino (-d) y el protocolo TCP." },
-        { q: "3. Configurar SNAT para salir por interfaz eth2:", opts: { A: "POSTROUTING e interfaz -o", B: "PREROUTING e interfaz -o", C: "POSTROUTING e interfaz -i" }, ans: "A", exp: "SNAT siempre va en POSTROUTING y usa la interfaz de salida (-o)." },
-        { q: "4. Aceptar tráfico NEW en puerto 21:", opts: { A: "En tabla NAT", B: "En tabla FILTER con -s", C: "En tabla FILTER con -d" }, ans: "C", exp: "El filtrado de paquetes (ACCEPT/DROP) se hace en la tabla filter." },
-        { q: "5. ¿Cuál es la política por defecto en DROP?", opts: { A: "iptables -P FORWARD DROP", B: "iptables -A FORWARD DROP", C: "iptables -p FORWARD DROP" }, ans: "A", exp: "Se usa -P (mayúscula) para definir la Política." },
-        { q: "6. Permitir conexiones ESTABLISHED,RELATED:", opts: { A: "Solo tráfico NEW", B: "En tabla FILTER", C: "En tabla NAT" }, ans: "B", exp: "Es vital para que los paquetes de respuesta vuelvan a pasar." },
-        { q: "7. ¿Cómo se activa el enrutamiento en el kernel?", opts: { A: "Valor 0", B: "sysctl -r", C: "Valor 1 con sysctl -w" }, ans: "C", exp: "El valor 1 habilita el 'forwarding' de IPs." },
-        { q: "8. Permiso en FILTER para FTP Pasivo:", opts: { A: "Hacia IP privada", B: "Hacia IP pública", C: "Usando --sport" }, ans: "B", exp: "En la cadena FORWARD el paquete ya lleva la IP de destino tras el NAT." },
-        { q: "9. Permitir entrada de datos modo Pasivo:", opts: { A: "Puerto 20", B: "DNAT en puertos altos", C: "ACCEPT en puertos altos (NEW)" }, ans: "C", exp: "El modo pasivo requiere abrir los puertos altos configurados." },
-        { q: "10. ¿Cómo bloquear acceso AL propio firewall?", opts: { A: "Cadena INPUT", B: "Cadena FORWARD", C: "Cadena OUTPUT" }, ans: "A", exp: "INPUT controla los paquetes que tienen como destino el propio host." }
+        { 
+            q: "1. Queremos redirigir el tráfico que llega al puerto 21 hacia nuestro servidor FTP. ¿Cuál es correcta?", 
+            opts: { A: "iptables -t nat -A PREROUTING -d 10.0.2.102 -p tcp --dport 21 -j DNAT --to-source 2.2.2.2", B: "iptables -t nat -A PREROUTING -d 10.0.2.102 -p tcp --dport 21 -j DNAT --to-destination 2.2.2.2", C: "iptables -A PREROUTING -d 10.0.2.102 -p tcp --dport 21 -j DNAT --to-destination 2.2.2.2" }, 
+            ans: "B", 
+            exp: "La trampa en A es --to-source (es para SNAT). En C falta '-t nat'." 
+        },
+        { 
+            q: "2. Toca abrir el rango de datos para el modo Pasivo en la tabla NAT. Ojo al detalle:", 
+            opts: { A: "iptables -t nat -A PREROUTING -d 10.0.2.102 -p udp --dport 40000:40100 -j DNAT --to-destination 2.2.2.2", B: "iptables -t nat -A PREROUTING -s 10.0.2.102 -p tcp --dport 40000:40100 -j DNAT --to-destination 2.2.2.2", C: "iptables -t nat -A PREROUTING -d 10.0.2.102 -p tcp --dport 40000:40100 -j DNAT --to-destination 2.2.2.2" }, 
+            ans: "C", 
+            exp: "En A el error es UDP. En B el error es usar -s (origen) en lugar de -d (destino)." 
+        },
+        { 
+            q: "3. Tienes que configurar el SNAT para enmascarar la IP al salir por la interfaz eth2. ¿Cuál no fallará?", 
+            opts: { A: "iptables -t nat -A POSTROUTING -o eth2 -s 10.0.2.0/24 -d 2.2.2.2 -j SNAT --to-source 2.2.2.3", B: "iptables -t nat -A PREROUTING -o eth2 -s 10.0.2.0/24 -d 2.2.2.2 -j SNAT --to-source 2.2.2.3", C: "iptables -t nat -A POSTROUTING -i eth2 -s 10.0.2.0/24 -d 2.2.2.2 -j SNAT --to-source 2.2.2.3" }, 
+            ans: "A", 
+            exp: "SNAT siempre va en POSTROUTING y usa interfaz de salida -o." 
+        },
+        { 
+            q: "4. Permiso (ACCEPT) para tráfico de control (puerto 21) detectando conexión nueva:", 
+            opts: { A: "iptables -t nat -A FORWARD -d 2.2.2.2 -p tcp --dport 21 -m conntrack --ctstate NEW -j ACCEPT", B: "iptables -A FORWARD -s 2.2.2.2 -p tcp --dport 21 -m conntrack --ctstate NEW -j ACCEPT", C: "iptables -A FORWARD -d 2.2.2.2 -p tcp --dport 21 -m conntrack --ctstate NEW -j ACCEPT" }, 
+            ans: "C", 
+            exp: "ACCEPT va en tabla filter (por defecto). En B se equivoca con -s (debe ser destino -d)." 
+        },
+        { 
+            q: "5. Política por defecto en DROP para el tráfico que atraviesa el firewall:", 
+            opts: { A: "iptables -P FORWARD DROP", B: "iptables -A FORWARD -j DROP", C: "iptables -p FORWARD DROP" }, 
+            ans: "A", 
+            exp: "Para políticas se usa -P (mayúscula). La -p es para protocolo." 
+        },
+        { 
+            q: "6. Dejar pasar paquetes de conexiones establecidas o relacionadas:", 
+            opts: { A: "iptables -A FORWARD -m conntrack --ctstate NEW,RELATED -j ACCEPT", B: "iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT", C: "iptables -t nat -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT" }, 
+            ans: "B", 
+            exp: "Es vital usar ESTABLISHED. En C intenta usar la tabla nat." 
+        },
+        { 
+            q: "7. Activar el enrutamiento en el kernel:", 
+            opts: { A: "sysctl -w net.ipv4.ip_forward=0", B: "sysctl -r net.ipv4.ip_forward=1", C: "sysctl -w net.ipv4.ip_forward=1" }, 
+            ans: "C", 
+            exp: "El 1 activa, el parámetro es -w (write)." 
+        },
+        { 
+            q: "8. Permiso en tabla FILTER para el rango de puertos del FTP Pasivo:", 
+            opts: { A: "iptables -A FORWARD -d 10.0.2.102 -p tcp --dport 40000:40100 -j ACCEPT", B: "iptables -A FORWARD -d 2.2.2.2 -p tcp --dport 40000:40100 -j ACCEPT", C: "iptables -A FORWARD -d 2.2.2.2 -p tcp --sport 40000:40100 -j ACCEPT" }, 
+            ans: "B", 
+            exp: "En FORWARD el paquete ya tiene la IP privada tras el DNAT." 
+        },
+        { 
+            q: "9. Permitir la entrada de datos mezclando Activo y Pasivo:", 
+            opts: { A: "iptables -A FORWARD -d 2.2.2.2 -p tcp --dport 20 -j ACCEPT", B: "iptables -t nat -A FORWARD -d 2.2.2.2 -p tcp --dport 40000:40100 -j ACCEPT", C: "iptables -A FORWARD -d 2.2.2.2 -p tcp --dport 40000:40100 -m conntrack --ctstate NEW -j ACCEPT" }, 
+            ans: "C", 
+            exp: "El puerto 20 es para el modo Activo. Aquí usamos el rango alto para el Pasivo." 
+        },
+        { 
+            q: "10. Bloquear conexión directa AL firewall sin afectar lo que lo atraviesa:", 
+            opts: { A: "iptables -P FORWARD DROP", B: "iptables -P INPUT DROP", C: "iptables -P OUTPUT DROP" }, 
+            ans: "B", 
+            exp: "INPUT es el tráfico con destino al propio host. FORWARD es el que atraviesa." 
+        }
     ];
 
     let aciertos = 0;
@@ -152,21 +203,18 @@
         const msg = document.getElementById('mensaje-final');
         
         resDiv.style.display = 'block';
-        circulo.innerText = `${aciertos}/${preguntas.length}`;
+        circulo.innerText = `${aciertos}/10`;
         
-        const porcentaje = (aciertos / preguntas.length) * 100;
-        
-        if(porcentaje >= 50) {
+        if(aciertos >= 5) {
             circulo.className = 'circle-wrap pass';
             msg.innerHTML = "¡SISTEMA PROTEGIDO!<br>Eres un maestro del firewall.";
             msg.style.color = "#81c784";
         } else {
             circulo.className = 'circle-wrap fail';
-            msg.innerHTML = "¡SISTEMA COMPROMETIDO!<br>El firewall te ha bloqueado.";
+            msg.innerHTML = "¡SISTEMA HACKEADO!<br>Repasa tus reglas.";
             msg.style.color = "#e57373";
         }
-        
-        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        resDiv.scrollIntoView({ behavior: 'smooth' });
     }
 </script>
 
